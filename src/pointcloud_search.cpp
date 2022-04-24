@@ -37,6 +37,7 @@ public:
     pcl::fromROSMsg(map, *map_cloud);
 
     tree_ptr_->setInputCloud(map_cloud);
+    RCLCPP_INFO(get_logger(), "create kd tree.");
   }
 
   void initialPoseCallback(const geometry_msgs::msg::PoseWithCovarianceStamped & initialpose)
@@ -48,6 +49,7 @@ public:
     point.z = 0.0;
 
     std::vector<Vector3> radius_points = tree_ptr_->radiusSearch(point, radius_);
+    RCLCPP_INFO(get_logger(), "search radius");
     pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>);
 
     for (auto points_vec : radius_points) {

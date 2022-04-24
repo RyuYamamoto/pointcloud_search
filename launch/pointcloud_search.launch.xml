@@ -1,9 +1,10 @@
 <launch>
   <arg name="radius" default="10.0"/>
+  <arg name="map_path" default=""/>
 
   <include file="$(find-pkg-share points_map_loader)/launch/points_map_loader.launch.xml">
     <arg name="rviz" value="false"/>
-    <arg name="map_path" value="/home/haze/ros2_ws/src/pointcloud_search/pcd/test.pcd"/>
+    <arg name="map_path" value="$(var map_path)"/>
   </include>
 
   <node pkg="pointcloud_search" exec="pointcloud_search_node" name="pointcloud_search_node">
