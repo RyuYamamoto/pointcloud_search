@@ -9,12 +9,14 @@
 struct Node
 {
   int axis;
+  int idx;
   Node * right;
   Node * left;
   std::vector<double> median;
   Node()
   {
     axis = -1;
+    idx = -1;
     right = nullptr;
     left = nullptr;
   }
@@ -53,6 +55,7 @@ public:
 
     Node * node = new Node();
     node->axis = axis;
+    node->idx = median;
     node->median = target_[median];
     node->left = build(l, median, depth + 1);
     node->right = build(median + 1, r, depth + 1);
@@ -68,35 +71,36 @@ public:
     return std::sqrt(dist);
   }
 
-  std::vector<Vector3> radiusSearch(const PointType point, const double radius)
+  std::vector<Vector3> radiusSearch(const PointType point, const double radius, std::vector<int> &indices)
   {
     Vector3 query{point.x, point.y, point.z};
     std::vector<Vector3> radius_points;
-    radiusSearchRecursive(query, radius, node_, radius_points);
+    radiusSearchRecursive(query, radius, node_, indices, radius_points);
     return radius_points;
   }
   void radiusSearchRecursive(
-    const Vector3 query, const double radius, Node * node, std::vector<Vector3> & radius_points)
+    const Vector3 query, const double radius, Node * node, std::vector<int> &indices, std::vector<Vector3> & radius_points)
   {
     if (node == nullptr) return;
 
     const double distance = calcEuclideanDistance(node->median, query);
     if (distance < radius) {
       radius_points.push_back(node->median);
+      indices.emplace_back(node->idx);
     }
 
     Node * next;
     if (query[node->axis] < node->median[node->axis]) {
-      radiusSearchRecursive(query, radius, node->left, radius_points);
+      radiusSearchRecursive(query, radius, node->left, indices, radius_points);
       next = node->right;
     } else {
-      radiusSearchRecursive(query, radius, node->right, radius_points);
+      radiusSearchRecursive(query, radius, node->right, indices, radius_points);
       next = node->left;
     }
 
     const double axis_diff = std::fabs(query[node->axis] - node->median[node->axis]);
     if (axis_diff < radius) {
-      radiusSearchRecursive(query, radius, next, radius_points);
+      radiusSearchRecursive(query, radius, next, indices, radius_points);
     }
 
     return;

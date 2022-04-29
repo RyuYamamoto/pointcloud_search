@@ -7,7 +7,7 @@
     <arg name="map_path" value="$(var map_path)"/>
   </include>
 
-  <node pkg="pointcloud_search" exec="pointcloud_search_node" name="pointcloud_search_node">
+  <node pkg="pointcloud_search" exec="pointcloud_search_node" name="pointcloud_search_node" output="screen">
     <param name="radius" value="$(var radius)"/>
   </node>
 
