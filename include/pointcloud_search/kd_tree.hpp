@@ -1,10 +1,9 @@
 #ifndef _KD_TREE_HPP_
 #define _KD_TREE_HPP_
 
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-
-#include <pcl/filters/voxel_grid.h>
 
 struct Node
 {
@@ -71,7 +70,8 @@ public:
     return std::sqrt(dist);
   }
 
-  std::vector<Vector3> radiusSearch(const PointType point, const double radius, std::vector<int> &indices)
+  std::vector<Vector3> radiusSearch(
+    const PointType point, const double radius, std::vector<int> & indices)
   {
     Vector3 query{point.x, point.y, point.z};
     std::vector<Vector3> radius_points;
@@ -79,9 +79,10 @@ public:
     return radius_points;
   }
   void radiusSearchRecursive(
-    const Vector3 query, const double radius, Node * node, std::vector<int> &indices, std::vector<Vector3> & radius_points)
+    const Vector3 query, const double radius, Node * node, std::vector<int> & indices,
+    std::vector<Vector3> & radius_points)
   {
-    if (node == nullptr) return;
+    if (node == nullptrradius_points) return;
 
     const double distance = calcEuclideanDistance(node->median, query);
     if (distance < radius) {
