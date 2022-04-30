@@ -18,7 +18,7 @@ public:
   : Node("pointcloud_search", node_options)
   {
     tree_ptr_ = std::make_shared<KDTree<pcl::PointXYZ>>();
-    voxel_grid_ptr_ = std::make_shared<VoxelGrid<pcl::PointXYZ>>();
+    voxel_grid_covariance_ptr_ = std::make_shared<VoxelGridCovariance<pcl::PointXYZ>>();
 
     radius_ = this->declare_parameter<double>("radius", 3.0);
 
@@ -52,9 +52,9 @@ public:
     pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(map, *map_cloud);
 
-    voxel_grid_ptr_->setLeafSize(2.0, 2.0, 2.0);
-    voxel_grid_ptr_->setInputCloud(map_cloud);
-    auto leaf_map = voxel_grid_ptr_->getVoxelGrid();
+    voxel_grid_covariance_ptr_->setLeafSize(2.0, 2.0, 2.0);
+    voxel_grid_covariance_ptr_->setInputCloud(map_cloud);
+    auto leaf_map = voxel_grid_covariance_ptr_->getLeafMap();
 
     int id = 0;
     pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_grid_points(new pcl::PointCloud<pcl::PointXYZ>);
@@ -128,7 +128,7 @@ public:
     clear_markers.markers.emplace_back(clear_marker);
     nd_voxel_result_marker_publisher_->publish(clear_markers);
 
-    auto leafs = voxel_grid_ptr_->getVoxelGrid();
+    auto leafs = voxel_grid_covariance_ptr_->getLeafMap();
 
     int id=0;
     visualization_msgs::msg::MarkerArray marker_array;
@@ -140,8 +140,9 @@ public:
       result->points.emplace_back(p);
 
       std::size_t indice=0;
+      // TODO index search
       for(auto leaf : leafs) {
-        if(leaf.second.mean[0] == p.x and leaf.second.mean[1] == p.y and leaf.second.mean[2] == p.z) {
+        if(leaf.second.mean[0] == p.x and leaf.second.mean[1] == p.y and leaf.second.mean[2] == p.voxel_centroids_leaf_indices_z) {
           indice = leaf.first;
           break;
         }
@@ -183,7 +184,7 @@ public:
 
 private:
   std::shared_ptr<KDTree<pcl::PointXYZ>> tree_ptr_;
-  std::shared_ptr<VoxelGrid<pcl::PointXYZ>> voxel_grid_ptr_;
+  std::shared_ptr<VoxelGridCovariance<pcl::PointXYZ>> voxel_grid_covariance_ptr_;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_subscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr

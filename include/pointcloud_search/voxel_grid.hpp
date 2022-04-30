@@ -31,11 +31,11 @@ struct Leaf
 };
 
 template <typename PointType>
-class VoxelGrid
+class VoxelGridCovariance
 {
 public:
-  VoxelGrid() : num_points_per_voxel_(3) {}
-  ~VoxelGrid() = default;
+  VoxelGridCovariance() : num_points_per_voxel_(3) {}
+  ~VoxelGridCovariance() = default;
 
   void setLeafSize(const double leaf_size_x, const double leaf_size_y, const double leaf_size_z)
   {
@@ -96,7 +96,7 @@ public:
     }
   }
 
-  std::map<std::size_t, Leaf> getVoxelGrid() { return leaf_map_; }
+  std::map<std::size_t, Leaf> getLeafMap() { return leaf_map_; }
 
 private:
   Eigen::Vector3f resolution_;
