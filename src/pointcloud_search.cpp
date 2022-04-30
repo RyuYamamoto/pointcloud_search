@@ -142,7 +142,7 @@ public:
       std::size_t indice=0;
       // TODO index search
       for(auto leaf : leafs) {
-        if(leaf.second.mean[0] == p.x and leaf.second.mean[1] == p.y and leaf.second.mean[2] == p.voxel_centroids_leaf_indices_z) {
+        if(leaf.second.mean[0] == p.x and leaf.second.mean[1] == p.y and leaf.second.mean[2] == p.z) {
           indice = leaf.first;
           break;
         }

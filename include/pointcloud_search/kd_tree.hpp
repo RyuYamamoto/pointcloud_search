@@ -82,7 +82,7 @@ public:
     const Vector3 query, const double radius, Node * node, std::vector<int> & indices,
     std::vector<Vector3> & radius_points)
   {
-    if (node == nullptrradius_points) return;
+    if (node == nullptr) return;
 
     const double distance = calcEuclideanDistance(node->median, query);
     if (distance < radius) {
