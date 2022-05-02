@@ -12,14 +12,10 @@
 
 struct Leaf
 {
-  // ボクセル内の点群数
   int num_points;
-  // 固有ベクトル
   Eigen::Matrix3f eigenvec;
   Eigen::Vector3f eigenvalues;
-  // ボクセル内の点群の平均(実質重心)
   Eigen::Vector3f mean;
-  // ボクセル内の点群の共分散行列
   Eigen::Matrix3f covariance;
   Leaf()
   {
@@ -30,11 +26,14 @@ struct Leaf
   }
 };
 
-template <typename PointType>
+template <class PointType>
 class VoxelGridCovariance
 {
 public:
-  VoxelGridCovariance() : num_points_per_voxel_(3) {}
+  VoxelGridCovariance() : num_points_per_voxel_(3)
+  {
+    filtered_points_.reset(new pcl::PointCloud<PointType>);
+  }
   ~VoxelGridCovariance() = default;
 
   void setLeafSize(const double leaf_size_x, const double leaf_size_y, const double leaf_size_z)
@@ -51,8 +50,15 @@ public:
     buildVoxelGrid(input);
   }
 
+  std::vector<int> getVoxelGridIndex() { return indices_; }
+
+  typename pcl::PointCloud<PointType>::Ptr getFilteredPoints() { return filtered_points_; }
+
   void buildVoxelGrid(const typename pcl::PointCloud<PointType>::Ptr input)
   {
+    leaf_map_.clear();
+    filtered_points_->points.clear();
+
     // get min and max coordinate of points
     Eigen::Vector4f min, max;
     pcl::getMinMax3D<PointType>(*input, min, max);
@@ -88,11 +94,23 @@ public:
     for (auto & leaf : leaf_map_) {
       const float size_per_voxel = static_cast<float>(leaf.second.num_points);
       leaf.second.mean = (leaf.second.mean / size_per_voxel);
-      leaf.second.covariance = ((leaf.second.covariance / size_per_voxel) - leaf.second.mean * leaf.second.mean.transpose());
-      Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(leaf.second.covariance);
-      if(solver.info() != Eigen::Success) continue;
-      leaf.second.eigenvec = solver.eigenvectors();
-      leaf.second.eigenvalues = solver.eigenvalues().asDiagonal().diagonal();
+
+      if (num_points_per_voxel_ <= leaf.second.num_points) {
+        PointType p;
+        p.x = leaf.second.mean[0];
+        p.y = leaf.second.mean[1];
+        p.z = leaf.second.mean[2];
+        filtered_points_->points.emplace_back(p);
+
+        indices_.emplace_back(leaf.first);
+        leaf.second.covariance =
+          ((leaf.second.covariance / size_per_voxel) -
+           leaf.second.mean * leaf.second.mean.transpose());
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(leaf.second.covariance);
+        if (solver.info() != Eigen::Success) continue;
+        leaf.second.eigenvec = solver.eigenvectors();
+        leaf.second.eigenvalues = solver.eigenvalues().asDiagonal().diagonal();
+      }
     }
   }
 
@@ -101,9 +119,12 @@ public:
 private:
   Eigen::Vector3f resolution_;
 
+  typename pcl::PointCloud<PointType>::Ptr filtered_points_;
+
   int num_points_per_voxel_;
 
   std::map<std::size_t, Leaf> leaf_map_;
+  std::vector<int> indices_;
 };
 
 #endif

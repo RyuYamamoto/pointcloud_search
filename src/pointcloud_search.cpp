@@ -44,9 +44,52 @@ public:
   }
   ~PointCloudSearch() = default;
 
+  visualization_msgs::msg::Marker convertLeafToMarker(
+    const Leaf leaf, const double r, const double g, const double b, const int id)
+  {
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = "map";
+    marker.header.stamp = rclcpp::Clock().now();
+    marker.ns = "nd voxel";
+    marker.id = id;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.type = visualization_msgs::msg::Marker::SPHERE;
+    marker.pose.position.x = leaf.mean[0];
+    marker.pose.position.y = leaf.mean[1];
+    marker.pose.position.z = leaf.mean[2];
+    Eigen::Quaternionf q(leaf.eigenvec);
+    marker.pose.orientation.x = q.x();
+    marker.pose.orientation.y = q.y();
+    marker.pose.orientation.z = q.z();
+    marker.pose.orientation.w = q.w();
+    marker.scale.x = std::sqrt(leaf.eigenvalues(0) * 9.21034);
+    marker.scale.y = std::sqrt(leaf.eigenvalues(1) * 9.21034);
+    marker.scale.z = std::sqrt(leaf.eigenvalues(2) * 9.21034);
+    marker.color.r = r;
+    marker.color.g = g;
+    marker.color.b = b;
+    marker.color.a = 0.5;
+
+    return marker;
+  }
+  visualization_msgs::msg::MarkerArray convertLeafToMarkerArray(
+    const std::map<std::size_t, Leaf> leafs, const double r, const double g, const double b)
+  {
+    int id = -1;
+    visualization_msgs::msg::MarkerArray marker_array;
+    for (auto leaf : leafs) {
+      visualization_msgs::msg::Marker marker = convertLeafToMarker(leaf.second, r, g, b, id++);
+      marker_array.markers.emplace_back(marker);
+    }
+    return marker_array;
+  }
+
   void mapCallback(const sensor_msgs::msg::PointCloud2 & map)
   {
-    if(map_update_) {return;}
+    if (map_update_) {
+      return;
+    }
     RCLCPP_INFO(get_logger(), "map callback");
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -54,52 +97,25 @@ public:
 
     voxel_grid_covariance_ptr_->setLeafSize(2.0, 2.0, 2.0);
     voxel_grid_covariance_ptr_->setInputCloud(map_cloud);
+
     auto leaf_map = voxel_grid_covariance_ptr_->getLeafMap();
-
-    int id = 0;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_grid_points(new pcl::PointCloud<pcl::PointXYZ>);
-    visualization_msgs::msg::MarkerArray marker_array;
-    for(auto leaf : leaf_map){
-      visualization_msgs::msg::Marker marker;
-      pcl::PointXYZ p;
-      p.x = leaf.second.mean.x();
-      p.y = leaf.second.mean.y();
-      p.z = leaf.second.mean.z();
-      voxel_grid_points->points.emplace_back(p);
-
-      marker.header.frame_id = "map";
-      marker.header.stamp = rclcpp::Clock().now();
-      marker.ns = "nd voxel";
-      marker.id = id++;
-      marker.action = visualization_msgs::msg::Marker::ADD;
-      marker.type = visualization_msgs::msg::Marker::SPHERE;
-      marker.pose.position.x = p.x;
-      marker.pose.position.y = p.y;
-      marker.pose.position.z = p.z;
-      Eigen::Quaternionf q(leaf.second.eigenvec);
-      marker.pose.orientation.x = q.x();
-      marker.pose.orientation.y = q.y();
-      marker.pose.orientation.z = q.z();
-      marker.pose.orientation.w = q.w();
-      marker.scale.x = std::sqrt(leaf.second.eigenvalues(0)*9.21034);
-      marker.scale.y = std::sqrt(leaf.second.eigenvalues(1)*9.21034);
-      marker.scale.z = std::sqrt(leaf.second.eigenvalues(2)*9.21034);
-      marker.color.r = 0.0;
-      marker.color.g = 1.0;
-      marker.color.b = 0.0;
-      marker.color.a = 0.5;
-      marker_array.markers.emplace_back(marker);
-    }
+    pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_grid_points =
+      voxel_grid_covariance_ptr_->getFilteredPoints();
     voxel_grid_points->header.frame_id = "map";
+
+    visualization_msgs::msg::MarkerArray marker_array =
+      convertLeafToMarkerArray(leaf_map, 0.0, 1.0, 0.0);
 
     sensor_msgs::msg::PointCloud2 voxel_points_msg;
     voxel_points_msg.header.frame_id = "map";
     voxel_points_msg.header.stamp = rclcpp::Clock().now();
     pcl::toROSMsg(*voxel_grid_points, voxel_points_msg);
+
     voxel_grid_points_publisher_->publish(voxel_points_msg);
     nd_voxel_marker_publisher_->publish(marker_array);
 
     tree_ptr_->setInputCloud(voxel_grid_points);
+
     RCLCPP_INFO(get_logger(), "create kd tree.");
     map_update_ = true;
   }
@@ -113,8 +129,7 @@ public:
     point.z = 0.0;
 
     std::vector<int> indices;
-    std::vector<Vector3> radius_points = tree_ptr_->radiusSearch(point, radius_, indices);
-    std::cout << "size: " << indices.size() << std::endl;
+    tree_ptr_->radiusSearch(point, radius_, indices);
     RCLCPP_INFO(get_logger(), "search radius");
     pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -129,48 +144,23 @@ public:
     nd_voxel_result_marker_publisher_->publish(clear_markers);
 
     auto leafs = voxel_grid_covariance_ptr_->getLeafMap();
+    auto leafs_index = voxel_grid_covariance_ptr_->getVoxelGridIndex();
+    pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_points =
+      voxel_grid_covariance_ptr_->getFilteredPoints();
 
-    int id=0;
+    int id = -1;
     visualization_msgs::msg::MarkerArray marker_array;
-    for (auto points_vec : radius_points) {
+    for (auto indice : indices) {
       pcl::PointXYZ p;
-      p.x = points_vec[0];
-      p.y = points_vec[1];
-      p.z = points_vec[2];
+      p.x = filtered_points->points[indice].x;
+      p.y = filtered_points->points[indice].y;
+      p.z = filtered_points->points[indice].z;
       result->points.emplace_back(p);
 
-      std::size_t indice=0;
-      // TODO index search
-      for(auto leaf : leafs) {
-        if(leaf.second.mean[0] == p.x and leaf.second.mean[1] == p.y and leaf.second.mean[2] == p.z) {
-          indice = leaf.first;
-          break;
-        }
-      }
-
+      auto leaf = leafs.find(leafs_index[indice]);
       // voxel
-      visualization_msgs::msg::Marker marker;
-      marker.header.frame_id = "map";
-      marker.header.stamp = rclcpp::Clock().now();
-      marker.ns = "nd voxel result";
-      marker.id = id++;
-      marker.action = visualization_msgs::msg::Marker::ADD;
-      marker.type = visualization_msgs::msg::Marker::SPHERE;
-      marker.pose.position.x = leafs[indice].mean[0];
-      marker.pose.position.y = leafs[indice].mean[1];
-      marker.pose.position.z = leafs[indice].mean[2];
-      Eigen::Quaternionf q(leafs[indice].eigenvec);
-      marker.pose.orientation.x = q.x();
-      marker.pose.orientation.y = q.y();
-      marker.pose.orientation.z = q.z();
-      marker.pose.orientation.w = q.w();
-      marker.scale.x = std::sqrt(leafs[indice].eigenvalues(0)*9.21034);
-      marker.scale.y = std::sqrt(leafs[indice].eigenvalues(1)*9.21034);
-      marker.scale.z = std::sqrt(leafs[indice].eigenvalues(2)*9.21034);
-      marker.color.r = 1.0;
-      marker.color.g = 0.0;
-      marker.color.b = 0.0;
-      marker.color.a = 1.0;
+      visualization_msgs::msg::Marker marker =
+        convertLeafToMarker(leaf->second, 1.0, 0.0, 0.0, id++);
       marker_array.markers.emplace_back(marker);
     }
     sensor_msgs::msg::PointCloud2 result_msg;
@@ -192,7 +182,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr result_points_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr voxel_grid_points_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr nd_voxel_marker_publisher_;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr nd_voxel_result_marker_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+    nd_voxel_result_marker_publisher_;
 
   double radius_;
   bool map_update_{false};
