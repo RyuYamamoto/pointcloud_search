@@ -58,7 +58,7 @@ public:
     marker.pose.position.x = leaf.mean[0];
     marker.pose.position.y = leaf.mean[1];
     marker.pose.position.z = leaf.mean[2];
-    Eigen::Quaternionf q(leaf.eigenvec);
+    Eigen::Quaterniond q(leaf.eigenvec);
     marker.pose.orientation.x = q.x();
     marker.pose.orientation.y = q.y();
     marker.pose.orientation.z = q.z();
